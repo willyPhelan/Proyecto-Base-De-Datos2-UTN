@@ -1,3 +1,27 @@
+-- =======================================================================
+-- SCRIPT 01: DDL - Creación de Base de Datos y Tablas
+-- Proyecto: BaseDatos2TPO
+-- =======================================================================
+
+-- 1. Crear la base de datos si no existe
+IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'BaseDatos2TPO')
+BEGIN
+    CREATE DATABASE BaseDatos2TPO;
+    PRINT 'Base de datos BaseDatos2TPO creada correctamente.';
+END
+ELSE
+BEGIN
+    PRINT 'La base de datos BaseDatos2TPO ya existe.';
+END
+GO
+
+USE BaseDatos2TPO;
+GO
+
+-- =======================================================================
+-- DEFINICIÓN DE TABLAS (DDL)
+-- =======================================================================
+
 -- 1. Módulo: Seguridad y Usuarios
 CREATE TABLE Usuario (
     IdUsuario INT IDENTITY(1,1) PRIMARY KEY,
