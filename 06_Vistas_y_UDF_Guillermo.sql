@@ -4,7 +4,10 @@
 -- Requisito previo: Haber ejecutado scripts del 01 al 05
 -- =======================================================================
 
+use BaseDatos2TPO ;
+
 -- 1. Vista: Catálogo de productos activos con su categoría
+
 CREATE OR ALTER VIEW dbo.VW_Catalogo_Productos
 AS
 SELECT 
@@ -19,20 +22,9 @@ INNER JOIN dbo.Categoria c ON p.IdCategoria = c.IdCategoria
 WHERE p.Activo = 1;
 GO
 
--- 2. Vista: Resumen de clientes registrados
-CREATE OR ALTER VIEW dbo.VW_Resumen_Clientes
-AS
-SELECT 
-    u.IdUsuario,
-    u.Nombre,
-    u.Apellido,
-    u.Email,
-    u.Rol
-FROM dbo.Usuario u
-WHERE u.Rol = 'Cliente';
-GO
+-- 2. Función Escalar: Total acumulado en compras pagadas por un usuario
+-- (Debe ir ANTES de la vista que la consume)
 
--- 3. Función Escalar: Total acumulado en compras pagadas por un usuario
 CREATE OR ALTER FUNCTION dbo.fn_CalcularTotalGastadoPorUsuario (@IdUsuario INT)
 RETURNS DECIMAL(10, 2)
 AS
@@ -45,6 +37,23 @@ BEGIN
 
     RETURN @TotalGastado;
 END;
+GO
+
+
+
+-- 3. Vista: Resumen de clientes registrados con total calculado
+
+CREATE OR ALTER VIEW dbo.VW_Resumen_Clientes
+AS
+SELECT 
+    u.IdUsuario,
+    u.Nombre,
+    u.Apellido,
+    u.Email,
+    u.Rol,
+    dbo.fn_CalcularTotalGastadoPorUsuario(u.IdUsuario) AS TotalGastado
+FROM dbo.Usuario u
+WHERE u.Rol = 'Cliente';
 GO
 
 -- =======================================================================
