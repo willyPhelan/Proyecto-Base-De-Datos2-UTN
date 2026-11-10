@@ -23,7 +23,7 @@ WHERE p.Activo = 1;
 GO
 
 -- 2. Función Escalar: Total acumulado en compras pagadas por un usuario
--- (Debe ir ANTES de la vista que la consume)
+
 
 CREATE OR ALTER FUNCTION dbo.fn_CalcularTotalGastadoPorUsuario (@IdUsuario INT)
 RETURNS DECIMAL(10, 2)
