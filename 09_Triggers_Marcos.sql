@@ -30,3 +30,8 @@ BEGIN
         RAISERROR('Error al agregar el producto al carrito: %s', 16, 1, @MensajeError);
     END CATCH
 END
+/*
+PRUEBAS
+INSERT INTO DetalleCarrito (IdCarrito, IdProducto, Cantidad) 
+VALUES (1, 1, 2); -- Intenta agregar una fila al DetalleCarrito, 
+                  -- pero como ya existe el producto 1, solo lo suma, no genera una nueva fila
