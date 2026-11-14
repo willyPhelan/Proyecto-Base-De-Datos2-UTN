@@ -1,0 +1,16 @@
+[
+  {
+    "Name": "API + Front",
+    "Projects": [
+      {
+        "Path": "BaseDatos2TPO_API.csproj",
+        "Action": "Start",
+        "DebugTarget": "BaseDatos2TPO_API"
+      },
+      {
+        "Path": "frontend\\BaseDatos2TPO_Front.esproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]
