@@ -134,3 +134,35 @@ BEGIN
     END CATCH
 END
 GO
+
+/* =======================================================================
+   BLOQUE DE PRUEBAS Y DEPURACIÓN - SCRIPT 07
+   (sp_ProcesarCompra y vw_HistorialVentas)
+   ======================================================================= 
+
+-- 1. PRUEBA DE LA VISTA: Consultar el historial de ventas actual
+SELECT * FROM dbo.vw_HistorialVentas;
+
+-- 2. PREPARACIÓN PARA EL SP: Verificamos el carrito del Usuario 2 (Marcos) 
+-- y el stock de los productos ANTES de la compra.
+SELECT DC.IdCarrito, P.Nombre, DC.Cantidad, P.Stock AS StockActual
+FROM dbo.DetalleCarrito DC
+INNER JOIN dbo.Producto P ON DC.IdProducto = P.IdProducto
+WHERE DC.IdCarrito = 2;
+
+-- 3. EJECUCIÓN DEL SP: Procesamos la compra del carrito del Usuario 2
+-- (Usando el Método de Pago 1 = Tarjeta de Crédito)
+EXEC dbo.sp_ProcesarCompra 
+    @IdUsuario = 2, 
+    @IdMetodoPago = 1;
+
+-- 4. VERIFICACIÓN DE IMPACTO (CARRITO Y STOCK): 
+-- Esta consulta ahora debería devolver 0 filas (carrito vacío) y si 
+-- consultamos Producto, el stock debió haber bajado.
+SELECT * FROM dbo.DetalleCarrito WHERE IdCarrito = 2;
+
+-- 5. VERIFICACIÓN FINAL DE LA VISTA: 
+-- Consultamos nuevamente y la nueva compra de Marcos debe aparecer acá.
+SELECT * FROM dbo.vw_HistorialVentas;
+
+======================================================================= */
