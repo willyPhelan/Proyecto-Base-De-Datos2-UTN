@@ -7,30 +7,34 @@ El sistema resuelve la problemática de gestionar un catálogo de productos, con
 
 ## 👥 Integrantes del Equipo
 *   **Guillermo Phelan** - Diseño de tablas, MockData base, Vistas y UDF.
-*   **Pablo Brito** - MockData de catálogo, Stored Procedure transaccional y Vistas.
+*   **Pablo Brito** - MockData de catálogo, Stored Procedure transaccional y Vista de historial.
 *   **Marcos Lewandowski** - MockData transaccional, Stored Procedure de reporte y Trigger de carrito.
-*   **Luka** - MockData de ensamblaje, Triggers de integridad de stock y recálculo de precios.
+*   **Luka Gallo** - MockData de ensamblaje, Triggers de integridad de stock, eliminación física y recálculo de precios.
 
 ---
 
 ## 🚀 Orden de Ejecución de Scripts
-Para desplegar correctamente la base de datos y probar todos los objetos de programación, los scripts deben ejecutarse en el siguiente orden estricto:
+Para desplegar correctamente la base de datos y probar todos los objetos de programación, puede utilizar el script maestro unificado o ejecutar los scripts individuales en el siguiente orden estricto:
 
-### 1. Estructura Base
+### Alternativa Todo-en-Uno (Recomendado)
+*   `00_Script_Integracion_Final.sql`: Script maestro que reconstruye la BD completa desde cero. Contiene la estructura, la carga de datos (Mock Data) y todos los objetos de programación unificados en un solo archivo de ejecución directa.
+
+### Ejecución Paso a Paso
+#### 1. Estructura Base
 *   `01_DDL_Tablas.sql`: Crea la base de datos `BaseDatos2TPO`, todas las tablas, Primary Keys, Foreign Keys y Constraints (CHECK).
 
-### 2. Carga de Datos (Mock Data)
+#### 2. Carga de Datos (Mock Data)
 *   `02_MockData_Guillermo.sql`: Usuarios, Categorías y Métodos de Pago.
 *   `03_MockData_Pablo.sql`: Productos, Carritos y Detalles de Carrito.
 *   `04_MockData_Marcos.sql`: Órdenes de Compra, Detalles de Orden, Configuraciones PC y Plantillas.
 *   `05_MockData_Luka.sql`: Detalles de Configuración y Detalles de Plantillas.
 
-### 3. Programación Avanzada (Objetos de BD)
+#### 3. Programación Avanzada (Objetos de BD)
 *   `06_Vistas_y_UDF_Guillermo.sql`: Vistas de catálogo/resumen y Función Escalar (UDF).
-*   `07_SP_Compra_Pablo.sql`: Stored Procedure de acción (`sp_ProcesarCompra`).
+*   `07_SP_y_Vista_Pablo.sql`: Stored Procedure de acción (`sp_ProcesarCompra`) y Vista de historial de ventas (`vw_HistorialVentas`).
 *   `08_SP_Reporte_Marcos.sql`: Stored Procedure de reporte de ventas.
 *   `09_Triggers_Marcos.sql`: Trigger `INSTEAD OF INSERT` en el carrito.
-*   `10_Triggers_Luka.sql`: Triggers `AFTER DELETE` (stock) y `AFTER UPDATE` (precios).
+*   `10_Triggers_Luka.sql`: Triggers `AFTER UPDATE` (restaurar stock / recalcular precios) e `INSTEAD OF DELETE` (eliminación de orden).
 
 ---
 
@@ -39,7 +43,7 @@ Para desplegar correctamente la base de datos y probar todos los objetos de prog
 ### 📊 Vistas (Views)
 1.  **`VW_Catalogo_Productos`**: Muestra el catálogo de productos activos con el nombre de su categoría (INNER JOIN).
 2.  **`VW_Resumen_Clientes`**: Resumen de usuarios con rol 'Cliente' que **consume la función UDF** para mostrar el total gastado por cada uno.
-3.  **`VW_Detalle_Ordenes_Exitosas`**: Reporte de ventas concretadas.
+3.  **`vw_HistorialVentas`**: Desnormaliza y centraliza los datos de compras uniendo 5 tablas (Cabecera, Detalle, Usuarios, Productos, Métodos de Pago) para alimentar los reportes del frontend.
 
 ### 🧮 Funciones de Usuario (UDF)
 *   **`fn_CalcularTotalGastadoPorUsuario(@IdUsuario)`**: Función escalar que suma el total de las compras en estado 'Pagado' de un usuario, manejando nulos con `ISNULL`.
@@ -50,8 +54,9 @@ Para desplegar correctamente la base de datos y probar todos los objetos de prog
 
 ### 🎯 Triggers
 *   **INSERT (`TR_AGREGAR_PRODUCTO_CARRITO`)**: Trigger `INSTEAD OF INSERT` en `DetalleCarrito`. Aplica la regla de negocio: si el usuario agrega un producto que ya tiene en el carrito, **suma la cantidad** en lugar de generar una fila duplicada (Upsert).
-*   **DELETE (`TR_RESTAURAR_STOCK`)**: Trigger `AFTER DELETE` en `OrdenCompra`. Si una orden se elimina/cancela, restaura automáticamente el stock físico de los productos asociados.
-*   **UPDATE (`TR_RECALCULAR_PRECIO_PLANTILLA`)**: Trigger `AFTER UPDATE` en `Producto`. Si cambia el precio de un componente, recalcula automáticamente el `PrecioTotalCalculado` de las plantillas pre-armadas que lo contienen (Bonus).
+*   **UPDATE (`TR_RESTAURAR_STOCK`)**: Trigger `AFTER UPDATE` en `OrdenCompra`. Si una orden se elimina/cancela, restaura automáticamente el stock físico de los productos asociados.
+*   **DELETE (`TR_ELIMINAR_ORDEN`)**: Trigger `INSTEAD OF DELETE` en `OrdenCompra`. Gestiona la baja física de una orden. Primero devuelve el stock físico al inventario, luego elimina los registros asociados en el detalle de la orden para evitar conflictos de claves foráneas, y por último elimina la cabecera de la compra.
+*   **UPDATE (`TR_RECALCULAR_PRECIO_PLANTILLA`)**: Trigger `AFTER UPDATE` en `Producto`. Si cambia el precio de un componente, recalcula automáticamente el `PrecioTotalCalculado` de las plantillas pre-armadas que lo contienen.
 
 ---
 
