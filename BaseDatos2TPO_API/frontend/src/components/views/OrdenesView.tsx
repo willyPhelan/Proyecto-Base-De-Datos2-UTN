@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp, Package, XCircle } from 'lucide-react';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { api } from '../../services/api';
@@ -30,6 +31,8 @@ export function OrdenesView() {
   const [detallesMap, setDetallesMap] = useState<Record<number, OrdenCompra>>({});
   const [loadingDetailId, setLoadingDetailId] = useState<number | null>(null);
   const [cancelingId, setCancelingId] = useState<number | null>(null);
+  const [ordenACancelar, setOrdenACancelar] = useState<number | null>(null);
+  const cerrarConfirmacion = useCallback(() => setOrdenACancelar(null), []);
 
   const fetchOrdenes = useCallback(async () => {
     if (!currentUser) return;
@@ -198,7 +201,7 @@ export function OrdenesView() {
                       <button
                         type="button"
                         disabled={cancelingId === orden.idOrden}
-                        onClick={() => handleCancelar(orden.idOrden)}
+                        onClick={() => setOrdenACancelar(orden.idOrden)}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
                       >
                         <XCircle className="h-3.5 w-3.5" />
@@ -255,6 +258,20 @@ export function OrdenesView() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={ordenACancelar !== null}
+        title={`¿Cancelar la orden #${ordenACancelar ?? ''}?`}
+        message="La orden quedará en estado Cancelado y el stock de sus productos se devolverá al inventario."
+        confirmLabel="Sí, cancelar orden"
+        cancelLabel="Volver"
+        onCancel={cerrarConfirmacion}
+        onConfirm={() => {
+          const id = ordenACancelar;
+          setOrdenACancelar(null);
+          if (id !== null) handleCancelar(id);
+        }}
+      />
     </div>
   );
 }

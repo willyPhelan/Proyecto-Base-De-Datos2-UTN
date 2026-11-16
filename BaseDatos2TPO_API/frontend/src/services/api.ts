@@ -22,15 +22,8 @@ import { ApiError } from './apiError';
 
 export { ApiError };
 
-function resolveBaseUrl(): string {
-  const raw = (import.meta.env.VITE_API_URL || '').trim();
-  if (/^https?:\/\//i.test(raw)) {
-    return raw.replace(/\/+$/, '');
-  }
-  return 'https://localhost:57801';
-}
-
-const BASE_URL = resolveBaseUrl();
+// La inyecta vite.config.ts desde "Urls" del appsettings.json de la API
+const BASE_URL: string = import.meta.env.VITE_API_URL;
 const REQUEST_TIMEOUT_MS = 2200;
 
 let isDemoMode = false;

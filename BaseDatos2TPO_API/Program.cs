@@ -21,11 +21,15 @@ builder.Services.AddScoped<OrdenService>();
 builder.Services.AddScoped<ConfiguracionService>();
 builder.Services.AddScoped<PlantillaService>();
 
+// La URL de la API sale de "Urls" y la del front de "Frontend:Url" (appsettings.json)
+string frontendUrl = builder.Configuration["Frontend:Url"]
+    ?? throw new InvalidOperationException("Falta 'Frontend:Url' en appsettings.json.");
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact",
         policy => policy
-            .AllowAnyOrigin()
+            .WithOrigins(frontendUrl.TrimEnd('/'))
             .AllowAnyHeader()
             .AllowAnyMethod()
     );
@@ -36,12 +40,7 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// En desarrollo no se redirige a HTTPS: si alguien llama por http://localhost:57802,
-// la redirección rompería las llamadas CORS (el navegador no la sigue en el preflight)
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
+app.UseHttpsRedirection();
 app.UseCors("AllowReact");
 app.UseAuthorization();
 app.MapControllers();

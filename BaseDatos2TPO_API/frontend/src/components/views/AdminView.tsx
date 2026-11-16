@@ -3,6 +3,7 @@ import {
   BarChart3,
   CreditCard,
   Edit2,
+  Eye,
   Layers,
   Package,
   Plus,
@@ -10,7 +11,9 @@ import {
   Tag,
   Trash2,
   Users,
+  X,
 } from 'lucide-react';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useStore } from '../../context/StoreContext';
 import { useToast } from '../../context/ToastContext';
 import { api } from '../../services/api';
@@ -66,6 +69,28 @@ export function AdminView() {
 
   // --- Estado Órdenes globales ---
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([]);
+  const [ordenExpandida, setOrdenExpandida] = useState<number | null>(null);
+  const [ordenDetalles, setOrdenDetalles] = useState<Record<number, OrdenCompra>>({});
+  // La orden del popup sale de la lista, así el estado se actualiza al cancelar
+  const ordenAbierta = ordenes.find((o) => o.idOrden === ordenExpandida) ?? null;
+
+  // Orden que espera confirmación para cancelarse
+  const [ordenACancelar, setOrdenACancelar] = useState<number | null>(null);
+  const cerrarConfirmacion = useCallback(() => setOrdenACancelar(null), []);
+  // Orden que espera confirmación para eliminarse
+  const [ordenAEliminar, setOrdenAEliminar] = useState<number | null>(null);
+  const cerrarConfirmacionEliminar = useCallback(() => setOrdenAEliminar(null), []);
+  const confirmacionAbierta = ordenACancelar !== null || ordenAEliminar !== null;
+
+  // Cerrar el popup con Escape (si está abierta una confirmación, Escape cierra solo esa)
+  useEffect(() => {
+    if (ordenExpandida === null || confirmacionAbierta) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOrdenExpandida(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [ordenExpandida, confirmacionAbierta]);
 
   // --- Estado Clientes y Reporte ---
   const [clientes, setClientes] = useState<ResumenCliente[]>([]);
@@ -340,6 +365,18 @@ export function AdminView() {
   };
 
   // Handlers Órdenes
+  const abrirDetalleOrden = async (idOrden: number) => {
+    setOrdenExpandida(idOrden);
+    if (!ordenDetalles[idOrden]) {
+      try {
+        const full = await api.getOrden(idOrden);
+        setOrdenDetalles((prev) => ({ ...prev, [idOrden]: full }));
+      } catch (err) {
+        showError(err, 'No se pudo cargar el detalle de la orden.');
+      }
+    }
+  };
+
   const handleChangeEstadoOrden = async (idOrden: number, estado: EstadoOrden) => {
     try {
       await api.updateEstadoOrden(idOrden, estado);
@@ -966,6 +1003,15 @@ export function AdminView() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => abrirDetalleOrden(o.idOrden)}
+                        aria-haspopup="dialog"
+                        className="inline-flex items-center gap-1 rounded border border-[#24293B] bg-[#171A26] px-2.5 py-1 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
+                      >
+                        <Eye className="h-3 w-3" />
+                        Detalle
+                      </button>
                       {o.estado === 'Pendiente' && (
                         <button
                           type="button"
@@ -978,7 +1024,7 @@ export function AdminView() {
                       {o.estado !== 'Cancelado' && (
                         <button
                           type="button"
-                          onClick={() => handleChangeEstadoOrden(o.idOrden, 'Cancelado')}
+                          onClick={() => setOrdenACancelar(o.idOrden)}
                           className="rounded border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/20"
                         >
                           Cancelar
@@ -986,7 +1032,7 @@ export function AdminView() {
                       )}
                       <button
                         type="button"
-                        onClick={() => handleDeleteOrden(o.idOrden)}
+                        onClick={() => setOrdenAEliminar(o.idOrden)}
                         aria-label={`Eliminar orden #${o.idOrden}`}
                         className="rounded p-1.5 text-red-400 hover:bg-red-500/10"
                       >
@@ -998,6 +1044,150 @@ export function AdminView() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Confirmación antes de cancelar una orden (baja lógica) */}
+      <ConfirmDialog
+        open={ordenACancelar !== null}
+        title={`¿Cancelar la orden #${ordenACancelar ?? ''}?`}
+        message="La orden quedará en estado Cancelado y el stock de sus productos se devolverá al inventario."
+        confirmLabel="Sí, cancelar orden"
+        cancelLabel="Volver"
+        onCancel={cerrarConfirmacion}
+        onConfirm={() => {
+          const id = ordenACancelar;
+          setOrdenACancelar(null);
+          if (id !== null) handleChangeEstadoOrden(id, 'Cancelado');
+        }}
+      />
+
+      {/* Confirmación antes de eliminar una orden (baja física) */}
+      <ConfirmDialog
+        open={ordenAEliminar !== null}
+        variant="danger"
+        title={`¿Eliminar la orden #${ordenAEliminar ?? ''}?`}
+        message="La orden y su detalle se borrarán definitivamente de la base. Si no estaba cancelada, el stock de sus productos se devolverá al inventario. Esta acción no se puede deshacer."
+        confirmLabel="Sí, eliminar orden"
+        cancelLabel="Volver"
+        onCancel={cerrarConfirmacionEliminar}
+        onConfirm={() => {
+          const id = ordenAEliminar;
+          setOrdenAEliminar(null);
+          if (id !== null) handleDeleteOrden(id);
+        }}
+      />
+
+      {/* Popup: detalle de una orden */}
+      {tab === 'ordenes' && ordenAbierta && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-4"
+          onClick={() => setOrdenExpandida(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="detalle-orden-titulo"
+            className="w-full max-w-2xl rounded-xl border border-[#24293B] bg-[#11131C] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[#24293B] p-5">
+              <div>
+                <h2 id="detalle-orden-titulo" className="font-display text-lg font-bold text-white">
+                  Orden #{ordenAbierta.idOrden}
+                </h2>
+                <p className="mt-1 text-xs text-slate-400">
+                  {ordenAbierta.cliente} · {formatDateTime(ordenAbierta.fechaOrden)} ·{' '}
+                  {ordenAbierta.metodoPago}
+                </p>
+                <p
+                  className={`mt-1 text-sm font-semibold ${
+                    ordenAbierta.estado === 'Pagado'
+                      ? 'text-emerald-400'
+                      : ordenAbierta.estado === 'Pendiente'
+                      ? 'text-amber-400'
+                      : 'text-red-400'
+                  }`}
+                >
+                  Estado: {ordenAbierta.estado}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOrdenExpandida(null)}
+                aria-label="Cerrar detalle"
+                className="rounded p-1.5 text-slate-400 hover:bg-white/5 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="overflow-x-auto p-5">
+              {!ordenDetalles[ordenAbierta.idOrden] ? (
+                <p className="text-sm text-slate-400">Cargando detalle...</p>
+              ) : ordenDetalles[ordenAbierta.idOrden].detalles.length === 0 ? (
+                <p className="text-sm text-slate-400">Sin ítems registrados en la orden.</p>
+              ) : (
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-[#24293B] text-xs text-slate-400">
+                      <th className="py-2 pr-4 font-medium">Producto</th>
+                      <th className="px-3 py-2 text-right font-medium">Cant.</th>
+                      <th className="px-3 py-2 text-right font-medium">Unitario</th>
+                      <th className="px-3 py-2 text-right font-medium">Subtotal</th>
+                      <th className="py-2 pl-3 text-right font-medium">Stock actual</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#24293B]/60">
+                    {ordenDetalles[ordenAbierta.idOrden].detalles.map((d) => {
+                      const stock = productos.find((p) => p.idProducto === d.idProducto)?.stock;
+                      return (
+                        <tr key={d.idDetalleOrden}>
+                          <td className="py-2.5 pr-4 text-slate-200">{d.producto}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-slate-300 tabular-nums">
+                            {d.cantidad}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-mono text-slate-300 tabular-nums">
+                            {formatARS(d.precioUnitario)}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-mono text-slate-300 tabular-nums">
+                            {formatARS(d.subtotal)}
+                          </td>
+                          <td className="py-2.5 pl-3 text-right font-mono text-base font-bold text-emerald-400 tabular-nums">
+                            {stock ?? '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-[#24293B] p-5">
+              <span className="font-mono text-base font-bold text-white tabular-nums">
+                Total: {formatARS(ordenAbierta.total)}
+              </span>
+              <div className="flex items-center gap-2">
+                {ordenAbierta.estado !== 'Cancelado' && (
+                  <button
+                    type="button"
+                    onClick={() => setOrdenACancelar(ordenAbierta.idOrden)}
+                    className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300 hover:bg-amber-500/20"
+                  >
+                    Cancelar orden
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setOrdenExpandida(null)}
+                  className="rounded-lg bg-[#A3FF12] px-3 py-2 text-xs font-semibold text-[#090A0F] hover:bg-[#B8FF47]"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
